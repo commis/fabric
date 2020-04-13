@@ -5,16 +5,18 @@
 ARG GO_VER
 ARG ALPINE_VER
 
-FROM alpine:${ALPINE_VER} as peer-base
-RUN apk add --no-cache tzdata
+#FROM alpine:${ALPINE_VER} as peer-base
+FROM fabric-golang.local as peer-base
+#RUN apk add --no-cache tzdata
 
-FROM golang:${GO_VER}-alpine${ALPINE_VER} as golang
-RUN apk add --no-cache \
-	bash \
-	gcc \
-	git \
-	make \
-	musl-dev
+#FROM golang:${GO_VER}-alpine${ALPINE_VER} as golang
+FROM hyperledger/fabric-golang.local as golang
+#RUN apk add --no-cache \
+#	bash \
+#	gcc \
+#	git \
+#	make \
+#	musl-dev
 ADD . $GOPATH/src/github.com/hyperledger/fabric
 WORKDIR $GOPATH/src/github.com/hyperledger/fabric
 

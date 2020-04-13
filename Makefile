@@ -78,7 +78,8 @@ GO_VER = 1.14.1
 GO_TAGS ?=
 
 RELEASE_EXES = orderer $(TOOLS_EXES)
-RELEASE_IMAGES = baseos ccenv orderer peer tools
+#RELEASE_IMAGES = baseos ccenv orderer peer tools
+RELEASE_IMAGES = baseos
 RELEASE_PLATFORMS = darwin-amd64 linux-amd64 linux-ppc64le linux-s390x windows-amd64
 TOOLS_EXES = configtxgen configtxlator cryptogen discover idemixgen peer
 
@@ -95,8 +96,16 @@ pkgmap.peer           := $(PKGNAME)/cmd/peer
 include docker-env.mk
 include gotools.mk
 
+OUTPUT_BIN_DIR = $(shell pwd)/../fabric-network/bin/
+
 .PHONY: all
-all: check-go-version native docker checks
+#all: check-go-version native docker checks
+all: check-go-version native
+	@docker images --filter "dangling=true" -q |xargs -ti docker rmi -f {}
+	$(shell if [ -d "$(OUTPUT_BIN_DIR)" ]; then cd build/bin/; cp -f configtxgen configtxlator cryptogen idemixgen $(OUTPUT_BIN_DIR); fi)
+
+base:
+	@./images/tools/build.sh $(GO_VER) $(ALPINE_VER)
 
 .PHONY: checks
 checks: basic-checks unit-test integration-test
@@ -290,7 +299,7 @@ publish-images: $(RELEASE_IMAGES:%=%-publish-images)
 
 .PHONY: clean
 clean: docker-clean unit-test-clean release-clean
-	-@rm -rf $(BUILD_DIR)
+	-@cd $(BUILD_DIR) && rm -rf docker/bin && find . -maxdepth 2 |egrep -v '((^.|bin|docker)$$|chaintool|gotools)' |xargs rm -rf
 
 .PHONY: clean-all
 clean-all: clean gotools-clean dist-clean
