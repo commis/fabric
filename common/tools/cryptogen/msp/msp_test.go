@@ -28,6 +28,7 @@ const (
 	testOrganizationalUnit = "Hyperledger Fabric"
 	testStreetAddress      = "testStreetAddress"
 	testPostalCode         = "123456"
+	testSANS               = []string{"ca", "127.0.0.1"}
 )
 
 var testDir = filepath.Join(os.TempDir(), "msp-test")
@@ -44,10 +45,10 @@ func testGenerateLocalMSP(t *testing.T, nodeOUs bool) {
 	tlsDir := filepath.Join(testDir, "tls")
 
 	// generate signing CA
-	signCA, err := ca.NewCA(caDir, testCAOrg, testCAName, testCountry, testProvince, testLocality, testOrganizationalUnit, testStreetAddress, testPostalCode)
+	signCA, err := ca.NewCA(caDir, testCAOrg, testCAName, testCountry, testProvince, testLocality, testOrganizationalUnit, testStreetAddress, testPostalCode, testSANS)
 	assert.NoError(t, err, "Error generating CA")
 	// generate TLS CA
-	tlsCA, err := ca.NewCA(tlsCADir, testCAOrg, testCAName, testCountry, testProvince, testLocality, testOrganizationalUnit, testStreetAddress, testPostalCode)
+	tlsCA, err := ca.NewCA(tlsCADir, testCAOrg, testCAName, testCountry, testProvince, testLocality, testOrganizationalUnit, testStreetAddress, testPostalCode, testSANS)
 	assert.NoError(t, err, "Error generating CA")
 
 	assert.NotEmpty(t, signCA.SignCert.Subject.Country, "country cannot be empty.")
@@ -140,10 +141,10 @@ func testGenerateVerifyingMSP(t *testing.T, nodeOUs bool) {
 	tlsCADir := filepath.Join(testDir, "tlsca")
 	mspDir := filepath.Join(testDir, "msp")
 	// generate signing CA
-	signCA, err := ca.NewCA(caDir, testCAOrg, testCAName, testCountry, testProvince, testLocality, testOrganizationalUnit, testStreetAddress, testPostalCode)
+	signCA, err := ca.NewCA(caDir, testCAOrg, testCAName, testCountry, testProvince, testLocality, testOrganizationalUnit, testStreetAddress, testPostalCode, testSANS)
 	assert.NoError(t, err, "Error generating CA")
 	// generate TLS CA
-	tlsCA, err := ca.NewCA(tlsCADir, testCAOrg, testCAName, testCountry, testProvince, testLocality, testOrganizationalUnit, testStreetAddress, testPostalCode)
+	tlsCA, err := ca.NewCA(tlsCADir, testCAOrg, testCAName, testCountry, testProvince, testLocality, testOrganizationalUnit, testStreetAddress, testPostalCode, testSANS)
 	assert.NoError(t, err, "Error generating CA")
 
 	err = msp.GenerateVerifyingMSP(mspDir, signCA, tlsCA, nodeOUs)

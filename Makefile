@@ -67,6 +67,7 @@ PKGNAME = github.com/$(PROJECT_NAME)
 CGO_FLAGS = CGO_CFLAGS=" "
 ARCH=$(shell go env GOARCH)
 MARCH=$(shell go env GOOS)-$(shell go env GOARCH)
+TARGET_VERSION=$(ARCH)-$(BASE_VERSION)-snapshot
 
 # defined in common/metadata/metadata.go
 METADATA_VAR = Version=$(BASE_VERSION)
@@ -95,7 +96,8 @@ PROJECT_FILES = $(shell git ls-files  | grep -v ^test | grep -v ^unit-test | \
 	grep -v ^.git | grep -v ^examples | grep -v ^devenv | grep -v .png$ | \
 	grep -v ^LICENSE | grep -v ^vendor )
 RELEASE_TEMPLATES = $(shell git ls-files | grep "release/templates")
-IMAGES = peer orderer ccenv buildenv tools
+#IMAGES = peer orderer ccenv buildenv tools
+IMAGES = peer orderer ccenv tools
 RELEASE_PLATFORMS = windows-amd64 darwin-amd64 linux-amd64 linux-s390x linux-ppc64le
 RELEASE_PKGS = configtxgen cryptogen idemixgen discover configtxlator peer orderer
 
@@ -110,7 +112,14 @@ pkgmap.discover       := $(PKGNAME)/cmd/discover
 
 include docker-env.mk
 
-all: native docker checks
+OUTPUT_BIN_DIR = $(shell pwd)/../fabric-network/bin/
+#all: native docker checks
+all: base native docker
+	@docker images --filter "dangling=true" -q |xargs -ti docker rmi -f {}
+	$(shell if [ -d "$(OUTPUT_BIN_DIR)" ]; then cd .build/bin/; cp -f configtxgen configtxlator cryptogen idemixgen $(OUTPUT_BIN_DIR); fi)
+
+base:
+	@cd images/tools && ./build.sh
 
 checks: basic-checks unit-test integration-test
 
@@ -201,7 +210,8 @@ test-cmd:
 
 docker: $(patsubst %,$(BUILD_DIR)/image/%/$(DUMMY), $(IMAGES))
 
-native: peer orderer configtxgen cryptogen idemixgen configtxlator discover
+#native: peer orderer configtxgen cryptogen idemixgen configtxlator discover
+native: configtxgen cryptogen idemixgen configtxlator
 
 linter: check-deps buildenv
 	@echo "LINT: Running code checks.."
@@ -222,7 +232,7 @@ generate-metrics-doc: buildenv
 $(BUILD_DIR)/%/chaintool: Makefile
 	@echo "Installing chaintool"
 	@mkdir -p $(@D)
-	curl -fL $(CHAINTOOL_URL) > $@
+	$(shell if [ ! -f "$(@)" ]; then curl -fL $(CHAINTOOL_URL) > $@; fi)
 	chmod +x $@
 
 # We (re)build a package within a docker context but persist the $GOPATH/pkg
@@ -236,7 +246,7 @@ $(BUILD_DIR)/docker/bin/%: $(PROJECT_FILES)
 		-v $(abspath $(BUILD_DIR)/docker/$(TARGET)/pkg):/opt/gopath/pkg \
 		-v $(abspath $(BUILD_DIR)/docker/gocache):/opt/gopath/cache \
 		-e GOCACHE=/opt/gopath/cache \
-		$(BASE_DOCKER_NS)/fabric-baseimage:$(BASE_DOCKER_TAG) \
+		fabric-baseimage.local:latest \
 		go install -tags "$(GO_TAGS)" -ldflags "$(DOCKER_GO_LDFLAGS)" $(pkgmap.$(@F))
 	@touch $@
 
@@ -256,7 +266,7 @@ $(BUILD_DIR)/docker/gotools: gotools.mk
 		-w /opt/gopath/src/$(PKGNAME) \
 		-v $(abspath $(BUILD_DIR)/docker/gocache):/opt/gopath/cache \
 		-e GOCACHE=/opt/gopath/cache \
-		$(BASE_DOCKER_NS)/fabric-baseimage:$(BASE_DOCKER_TAG) \
+		fabric-baseimage.local:latest \
 		make -f gotools.mk GOTOOLS_BINDIR=/opt/gotools/bin GOTOOLS_GOPATH=/opt/gotools/obj
 
 $(BUILD_DIR)/bin/%: $(PROJECT_FILES)
@@ -297,17 +307,15 @@ $(BUILD_DIR)/image/%/Dockerfile: images/%/Dockerfile.in
 $(BUILD_DIR)/image/tools/$(DUMMY): $(BUILD_DIR)/image/tools/Dockerfile
 	$(eval TARGET = ${patsubst $(BUILD_DIR)/image/%/$(DUMMY),%,${@}})
 	@echo "Building docker $(TARGET)-image"
-	$(DBUILD) -t $(DOCKER_NS)/fabric-$(TARGET) -f $(@D)/Dockerfile .
-	docker tag $(DOCKER_NS)/fabric-$(TARGET) $(DOCKER_NS)/fabric-$(TARGET):$(DOCKER_TAG)
-	docker tag $(DOCKER_NS)/fabric-$(TARGET) $(DOCKER_NS)/fabric-$(TARGET):$(ARCH)-latest
+	$(DBUILD) -t $(DOCKER_NS)/fabric-$(TARGET):$(TARGET_VERSION) -f $(@D)/Dockerfile .
+	#docker tag $(DOCKER_NS)/fabric-$(TARGET) $(DOCKER_NS)/fabric-$(TARGET):$(DOCKER_TAG)
 	@touch $@
 
 $(BUILD_DIR)/image/%/$(DUMMY): Makefile $(BUILD_DIR)/image/%/payload $(BUILD_DIR)/image/%/Dockerfile
 	$(eval TARGET = ${patsubst $(BUILD_DIR)/image/%/$(DUMMY),%,${@}})
 	@echo "Building docker $(TARGET)-image"
-	$(DBUILD) -t $(DOCKER_NS)/fabric-$(TARGET) $(@D)
-	docker tag $(DOCKER_NS)/fabric-$(TARGET) $(DOCKER_NS)/fabric-$(TARGET):$(DOCKER_TAG)
-	docker tag $(DOCKER_NS)/fabric-$(TARGET) $(DOCKER_NS)/fabric-$(TARGET):$(ARCH)-latest
+	$(DBUILD) -t $(DOCKER_NS)/fabric-$(TARGET):$(TARGET_VERSION) $(@D)
+	#docker tag $(DOCKER_NS)/fabric-$(TARGET) $(DOCKER_NS)/fabric-$(TARGET):$(DOCKER_TAG)
 	@touch $@
 
 $(BUILD_DIR)/gotools.tar.bz2: $(BUILD_DIR)/docker/gotools
@@ -413,8 +421,10 @@ docker-list: $(patsubst %,%-docker-list, $(IMAGES))
 
 %-docker-clean:
 	$(eval TARGET = ${patsubst %-docker-clean,%,${@}})
-	-docker images --quiet --filter=reference='$(DOCKER_NS)/fabric-$(TARGET):$(ARCH)-$(BASE_VERSION)$(if $(EXTRA_VERSION),-snapshot-*,)' | xargs docker rmi -f
-	-@rm -rf $(BUILD_DIR)/image/$(TARGET) ||:
+	-@-docker images --quiet --filter=reference='$(DOCKER_NS)/fabric-$(TARGET):$(TARGET_VERSION)' |xargs -ti docker rmi -f {}
+#	-docker images --quiet --filter=reference='$(DOCKER_NS)/fabric-$(TARGET):$(ARCH)-$(BASE_VERSION)$(if $(EXTRA_VERSION),-snapshot-*,)' | xargs docker rmi -f
+#	-@rm -rf $(BUILD_DIR)/image/$(TARGET) ||:
+	-@docker images |grep '<none>' |awk '{print $$3}' |xargs -ti docker rmi -f {}
 
 docker-clean: $(patsubst %,%-docker-clean, $(IMAGES))
 
@@ -432,7 +442,7 @@ docker-tag-stable: $(IMAGES:%=%-docker-tag-stable)
 
 .PHONY: clean
 clean: docker-clean unit-test-clean release-clean
-	-@rm -rf $(BUILD_DIR)
+	-@cd $(BUILD_DIR) && rm -rf docker/bin && find . -maxdepth 2 |egrep -v '((^.|bin|docker)$$|chaintool|gotools)' |xargs rm -rf
 
 .PHONY: clean-all
 clean-all: clean gotools-clean dist-clean
@@ -455,4 +465,4 @@ release-clean: $(patsubst %,%-release-clean, $(RELEASE_PLATFORMS))
 
 .PHONY: unit-test-clean
 unit-test-clean:
-	cd unit-test && docker-compose down
+	-@cd unit-test && docker-compose down >/dev/null

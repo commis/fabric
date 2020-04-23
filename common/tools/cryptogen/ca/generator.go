@@ -32,14 +32,14 @@ type CA struct {
 	OrganizationalUnit string
 	StreetAddress      string
 	PostalCode         string
-	//SignKey  *ecdsa.PrivateKey
+	// SignKey  *ecdsa.PrivateKey
 	Signer   crypto.Signer
 	SignCert *x509.Certificate
 }
 
 // NewCA creates an instance of CA and saves the signing key pair in
 // baseDir/name
-func NewCA(baseDir, org, name, country, province, locality, orgUnit, streetAddress, postalCode string) (*CA, error) {
+func NewCA(baseDir, org, name, country, province, locality, orgUnit, streetAddress, postalCode string, sans []string) (*CA, error) {
 
 	var response error
 	var ca *CA
@@ -54,7 +54,7 @@ func NewCA(baseDir, org, name, country, province, locality, orgUnit, streetAddre
 			response = err
 			if err == nil {
 				template := x509Template()
-				//this is a CA
+				// this is a CA
 				template.IsCA = true
 				template.KeyUsage |= x509.KeyUsageDigitalSignature |
 					x509.KeyUsageKeyEncipherment | x509.KeyUsageCertSign |
@@ -64,13 +64,23 @@ func NewCA(baseDir, org, name, country, province, locality, orgUnit, streetAddre
 					x509.ExtKeyUsageServerAuth,
 				}
 
-				//set the organization for the subject
+				// set the organization for the subject
 				subject := subjectTemplateAdditional(country, province, locality, orgUnit, streetAddress, postalCode)
 				subject.Organization = []string{org}
 				subject.CommonName = name
 
 				template.Subject = subject
 				template.SubjectKeyId = priv.SKI()
+
+				for _, san := range sans {
+					// try to parse as an IP address first
+					ip := net.ParseIP(san)
+					if ip != nil {
+						template.IPAddresses = append(template.IPAddresses, ip)
+					} else {
+						template.DNSNames = append(template.DNSNames, san)
+					}
+				}
 
 				x509Cert, err := genCertificateECDSA(baseDir, name, &template, &template,
 					ecPubKey, signer)
@@ -103,7 +113,7 @@ func (ca *CA) SignCertificate(baseDir, name string, ous, sans []string, pub *ecd
 	template.KeyUsage = ku
 	template.ExtKeyUsage = eku
 
-	//set the organization for the subject
+	// set the organization for the subject
 	subject := subjectTemplateAdditional(ca.Country, ca.Province, ca.Locality, ca.OrganizationalUnit, ca.StreetAddress, ca.PostalCode)
 	subject.CommonName = name
 
@@ -176,7 +186,7 @@ func x509Template() x509.Certificate {
 	// round minute and backdate 5 minutes
 	notBefore := time.Now().Round(time.Minute).Add(-5 * time.Minute).UTC()
 
-	//basic template to use
+	// basic template to use
 	x509 := x509.Certificate{
 		SerialNumber:          serialNumber,
 		NotBefore:             notBefore,
@@ -191,19 +201,19 @@ func x509Template() x509.Certificate {
 func genCertificateECDSA(baseDir, name string, template, parent *x509.Certificate, pub *ecdsa.PublicKey,
 	priv interface{}) (*x509.Certificate, error) {
 
-	//create the x509 public cert
+	// create the x509 public cert
 	certBytes, err := x509.CreateCertificate(rand.Reader, template, parent, pub, priv)
 	if err != nil {
 		return nil, err
 	}
 
-	//write cert out to file
+	// write cert out to file
 	fileName := filepath.Join(baseDir, name+"-cert.pem")
 	certFile, err := os.Create(fileName)
 	if err != nil {
 		return nil, err
 	}
-	//pem encode the cert
+	// pem encode the cert
 	err = pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
 	certFile.Close()
 	if err != nil {
