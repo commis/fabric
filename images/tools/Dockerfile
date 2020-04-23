@@ -5,7 +5,7 @@
 ARG GO_VER
 ARG ALPINE_VER
 #FROM golang:${GO_VER}-alpine${ALPINE_VER} as golang
-FROM fabric-golang.local as golang
+FROM fabric-golang.local:latest as golang
 #RUN apk add --no-cache \
 #	bash \
 #	gcc \
@@ -20,7 +20,7 @@ FROM golang as tools
 RUN make configtxgen configtxlator cryptogen peer discover idemixgen
 
 #FROM golang:${GO_VER}-alpine
-FROM hyperledger/fabric-golang.local
+FROM fabric-golang.local:latest
 # git is required to support `go list -m`
 #RUN apk add --no-cache \
 #	bash \

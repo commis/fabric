@@ -6,7 +6,7 @@ SCRIPT_DIR=$(cd $(dirname $(readlink -f "$0")) && pwd)
 
 GO_VER=1.14.1
 ALPINE_VER=3.11
-DOCKER_IMAGES="Dockerfile.golang-golang.local"
+DOCKER_IMAGES="golang.Dockerfile-golang.local"
 
 build_dockerImage() {
     for str in ${DOCKER_IMAGES}; do

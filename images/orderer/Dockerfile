@@ -5,11 +5,11 @@
 ARG GO_VER
 ARG ALPINE_VER
 #FROM alpine:${ALPINE_VER} as base
-FROM fabric-golang.local as base
+FROM fabric-golang.local:latest as base
 #RUN apk add --no-cache tzdata
 
 #FROM golang:${GO_VER}-alpine${ALPINE_VER} as golang
-FROM fabric-golang.local as golang
+FROM fabric-golang.local:latest as golang
 #RUN apk add --no-cache \
 #	gcc \
 #	musl-dev \

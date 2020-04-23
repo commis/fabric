@@ -5,7 +5,7 @@
 ARG GO_VER
 ARG ALPINE_VER
 #FROM golang:${GO_VER}-alpine${ALPINE_VER}
-FROM fabric-golang.local
+FROM fabric-golang.local:latest
 #RUN apk add --no-cache \
 #	g++ \
 #	gcc \

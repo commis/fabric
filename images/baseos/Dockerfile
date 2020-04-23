@@ -4,8 +4,9 @@
 
 ARG GO_VER
 ARG ALPINE_VER
+
 #FROM alpine:${ALPINE_VER} as base
-FROM fabric-golang.local as base
+FROM fabric-golang.local:latest as base
 #RUN apk add --no-cache tzdata
 RUN addgroup -g 500 chaincode && adduser -u 500 -D -h /home/chaincode -G chaincode chaincode
 USER chaincode

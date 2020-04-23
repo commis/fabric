@@ -67,6 +67,7 @@ TWO_DIGIT_VERSION = $(shell echo $(BASE_VERSION) | cut -d '.' -f 1,2)
 PKGNAME = github.com/hyperledger/fabric
 ARCH=$(shell go env GOARCH)
 MARCH=$(shell go env GOOS)-$(shell go env GOARCH)
+TARGET_VERSION=$(ARCH)-$(BASE_VERSION)-snapshot
 
 # defined in common/metadata/metadata.go
 METADATA_VAR = Version=$(BASE_VERSION)
@@ -100,8 +101,7 @@ OUTPUT_BIN_DIR = $(shell pwd)/../fabric-network/bin/
 
 .PHONY: all
 #all: check-go-version native docker checks
-all: check-go-version native
-	@docker images --filter "dangling=true" -q |xargs -ti docker rmi -f {}
+all: check-go-version base native docker clean-dangling
 	$(shell if [ -d "$(OUTPUT_BIN_DIR)" ]; then cd build/bin/; cp -f configtxgen configtxlator cryptogen idemixgen $(OUTPUT_BIN_DIR); fi)
 
 base:
@@ -231,10 +231,8 @@ $(BUILD_DIR)/images/%/$(DUMMY):
 		--build-arg GO_VER=$(GO_VER) \
 		--build-arg ALPINE_VER=$(ALPINE_VER) \
 		$(BUILD_ARGS) \
-		-t $(DOCKER_NS)/fabric-$* ./$(BUILD_CONTEXT)
-	docker tag $(DOCKER_NS)/fabric-$* $(DOCKER_NS)/fabric-$*:$(BASE_VERSION)
-	docker tag $(DOCKER_NS)/fabric-$* $(DOCKER_NS)/fabric-$*:$(TWO_DIGIT_VERSION)
-	docker tag $(DOCKER_NS)/fabric-$* $(DOCKER_NS)/fabric-$*:$(DOCKER_TAG)
+		-t $(DOCKER_NS)/fabric-$*:$(TARGET_VERSION) ./$(BUILD_CONTEXT)
+	#docker tag $(DOCKER_NS)/fabric-$* $(DOCKER_NS)/fabric-$*:$(BASE_VERSION)
 	@touch $@
 
 # builds release packages for the host platform
@@ -276,7 +274,7 @@ docker-list: $(RELEASE_IMAGES:%=%-docker-list)
 .PHONY: docker-clean
 docker-clean: $(RELEASE_IMAGES:%=%-docker-clean)
 %-docker-clean:
-	-@for image in "$$(docker images --quiet --filter=reference='$(DOCKER_NS)/fabric-$*:$(DOCKER_TAG)')"; do \
+	-@for image in "$$(docker images --quiet --filter=reference='$(DOCKER_NS)/fabric-$*:$(TARGET_VERSION)')"; do \
 		[ -z "$$image" ] || docker rmi -f $$image; \
 	done
 	-@rm -rf $(BUILD_DIR)/images/$* || true
@@ -298,8 +296,12 @@ publish-images: $(RELEASE_IMAGES:%=%-publish-images)
 	@docker push $(DOCKER_NS)/fabric-$*:$(PROJECT_VERSION)
 
 .PHONY: clean
-clean: docker-clean unit-test-clean release-clean
-	-@cd $(BUILD_DIR) && rm -rf docker/bin && find . -maxdepth 2 |egrep -v '((^.|bin|docker)$$|chaintool|gotools)' |xargs rm -rf
+clean: docker-clean unit-test-clean release-clean clean-dangling
+	-@rm -rf $(BUILD_DIR)
+
+.PHONY: clean-dangling
+clean-dangling:
+	@docker images --filter "dangling=true" -q |xargs -ti docker rmi -f {}
 
 .PHONY: clean-all
 clean-all: clean gotools-clean dist-clean
