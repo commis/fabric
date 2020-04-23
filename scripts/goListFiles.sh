@@ -13,7 +13,7 @@ find_golang_src() {
 list_deps() {
     target=$1
 
-    deps=`go list -f '{{ join .Deps "\n" }}' $target/...`
+    deps=$(go list -f '{{ join .Deps "\n" }}' $target/...)
 
     find_golang_src $GOPATH/src/$target
 
@@ -26,5 +26,4 @@ list_deps() {
         fi
     done
 }
-
 list_deps $1 | sort | uniq

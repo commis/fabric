@@ -232,8 +232,7 @@ generate-metrics-doc: buildenv
 $(BUILD_DIR)/%/chaintool: Makefile
 	@echo "Installing chaintool"
 	@mkdir -p $(@D)
-	$(shell if [ ! -f "$(@)" ]; then curl -fL $(CHAINTOOL_URL) > $@; fi)
-	chmod +x $@
+	$(shell if [ ! -f "$(@)" ]; then curl -fL $(CHAINTOOL_URL) > $@; chmod +x $@; fi)
 
 # We (re)build a package within a docker context but persist the $GOPATH/pkg
 # directory so that subsequent builds are faster
@@ -319,20 +318,20 @@ $(BUILD_DIR)/image/%/$(DUMMY): Makefile $(BUILD_DIR)/image/%/payload $(BUILD_DIR
 	@touch $@
 
 $(BUILD_DIR)/gotools.tar.bz2: $(BUILD_DIR)/docker/gotools
-	(cd $</bin && tar -jc *) > $@
+	(cd $</bin && tar -jhc *) > $@
 
 $(BUILD_DIR)/goshim.tar.bz2: $(GOSHIM_DEPS)
 	@echo "Creating $@"
 	@tar -jhc -C $(GOPATH)/src $(patsubst $(GOPATH)/src/%,%,$(GOSHIM_DEPS)) > $@
 
 $(BUILD_DIR)/sampleconfig.tar.bz2: $(shell find sampleconfig -type f)
-	(cd sampleconfig && tar -jc *) > $@
+	(cd sampleconfig && tar -jhc *) > $@
 
 $(BUILD_DIR)/protos.tar.bz2: $(PROTOS)
 
 $(BUILD_DIR)/%.tar.bz2:
 	@echo "Creating $@"
-	@tar -jc $^ > $@
+	@tar -jhc $^ > $@
 
 # builds release packages for the host platform
 release: $(patsubst %,release/%, $(MARCH))
@@ -407,7 +406,7 @@ dist-all: dist-clean $(patsubst %,dist/%, $(RELEASE_PLATFORMS))
 dist/%: release/%
 	mkdir -p release/$(@F)/config
 	cp -r sampleconfig/*.yaml release/$(@F)/config
-	cd release/$(@F) && tar -czvf hyperledger-fabric-$(@F).$(PROJECT_VERSION).tar.gz *
+	cd release/$(@F) && tar -hczvf hyperledger-fabric-$(@F).$(PROJECT_VERSION).tar.gz *
 
 .PHONY: protos
 protos: buildenv
@@ -422,8 +421,7 @@ docker-list: $(patsubst %,%-docker-list, $(IMAGES))
 %-docker-clean:
 	$(eval TARGET = ${patsubst %-docker-clean,%,${@}})
 	-@-docker images --quiet --filter=reference='$(DOCKER_NS)/fabric-$(TARGET):$(TARGET_VERSION)' |xargs -ti docker rmi -f {}
-#	-docker images --quiet --filter=reference='$(DOCKER_NS)/fabric-$(TARGET):$(ARCH)-$(BASE_VERSION)$(if $(EXTRA_VERSION),-snapshot-*,)' | xargs docker rmi -f
-#	-@rm -rf $(BUILD_DIR)/image/$(TARGET) ||:
+	-@rm -rf $(BUILD_DIR)/image/$(TARGET) ||:
 	-@docker images |grep '<none>' |awk '{print $$3}' |xargs -ti docker rmi -f {}
 
 docker-clean: $(patsubst %,%-docker-clean, $(IMAGES))
@@ -441,7 +439,8 @@ docker-tag-stable: $(IMAGES:%=%-docker-tag-stable)
 	docker tag $(DOCKER_NS)/fabric-$(TARGET):$(DOCKER_TAG) $(DOCKER_NS)/fabric-$(TARGET):stable
 
 .PHONY: clean
-clean: docker-clean unit-test-clean release-clean
+#clean: docker-clean unit-test-clean release-clean
+clean: docker-clean
 	-@cd $(BUILD_DIR) && rm -rf docker/bin && find . -maxdepth 2 |egrep -v '((^.|bin|docker)$$|chaintool|gotools)' |xargs rm -rf
 
 .PHONY: clean-all
